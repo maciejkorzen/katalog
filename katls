@@ -1,0 +1,232 @@
+#!/bin/sh
+# Katalog by Maciej Korzen <maciek@korzen.org>
+# KATalogLiSt - list names of databases, or content(s) of base(s).
+#
+#    Copyright (C) 2001-2003 Maciej Korzen
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+# Default settings
+data="/usr/share/katalog"
+debug="off"
+compressed="on"
+me="`basename $0`"
+reverse="off"
+verbose="off"
+version="1.10pre2"
+BOLD="\033[1;37m"
+NORMAL="\033[0m"
+
+# Load settings
+for i in /etc/katalogrc /usr/local/etc/katalogrc .katalogrc katalogrc $HOME/.katalogrc ; do
+  if [ -e "$i" ] ; then
+    . "$i"
+  fi
+done
+
+# List all bases
+bases_list() {
+  find ./ -type f ! -name '*.dsc' | find_filter
+}
+
+# Compressed file CAT
+ccat() {
+  type="`file \"$1\"`"
+  if echo "$type" | grep -q gzip; then
+    cat "$1" | gunzip
+  elif echo "$type" | grep -q bzip2; then
+    cat "$1" | bunzip2
+  elif echo "$type" | grep -q ASCII; then
+    cat "$1"
+  else
+    echo "$me: $1 - unknown type of file" >&2
+    exit 1
+  fi
+}
+
+check_val() {
+  if [ "x$2" != "xon" -a "x$2" != "xoff" ]; then
+    verbose "$me: $2 is bad value for $1"
+    exit 1
+  fi
+}
+
+find_filter() {
+  sed 's/^.\///' | egrep -v '(^ *$|^./$|^.$)' | sort
+}
+
+is_empty() {
+  if [ -z "$2" ] ; then
+    verbose "$me: argument for $1 needed"
+    exit 1
+  fi
+}
+
+# Print the name of the base
+print_base_name() {
+  desc="`cat $data/$1.dsc`"
+    if [ "$reverse" = "on" ] ; then
+      echo -e "${BOLD}$1${NORMAL} ($desc)"
+    else
+      echo -e "${BOLD}${desc}${NORMAL} ($1)"
+    fi
+}
+
+verbose() {
+  if [ "x$verbose" != "xoff" ] ; then
+    echo "$@"
+  fi
+}
+
+version() {
+  echo "Katalog $version"
+}
+
+usage() {
+cat << EOF
+Usage: katls [-h] [-V] [-k dir] [-c on|off] [-r on|off] [-d on|off] [-v on|off]
+             [first_base second_base ...|all]
+
+  -h              this help,
+  -V              display version number,
+  -k dir          'dir' is a dircetory with bases,
+  -c on|off       on:  show also in contents of compressed files
+                  off: don't show contents of compressed files
+  -r on|off       on:  display bases names as 'file_name (Description of base)'
+                  off: display bases names as 'Description of base (file_name)'
+  -d on|off       turn debug mode on or off
+  -v on|off       turn verbose mode on or off
+
+ If you don't specify any base name, then instead of content of base(s),
+ bases list will be shown. If you want to display contents of all bases
+ use 'all' as parameter.
+EOF
+}
+
+check_val compressed "$compressed"
+check_val debug "$debug"
+check_val reverse "$reverse"
+check_val verbose "$verbose"
+
+while [ "$#" -gt 0 ] ; do
+  case $1 in
+    -h)
+      usage
+      exit 0
+      ;;
+    -V)
+      version
+      exit 0
+      ;;
+    -k)
+      is_empty "-k" "$2"
+      data="$2"
+      shift 2
+      ;;
+    -c)
+      compressed="$2"
+      check_val "-c" "$compressed"
+      shift 2
+      ;;
+    -r)
+      reverse="$2"
+      check_val "-r" "$reverse"
+      shift 2
+      ;;
+    -d)
+      debug="$2"
+      check_val "-d" "$debug"
+      shift 2
+      ;;
+    -v)
+      verbose="$2"
+      check_val "-v" "$verbose"
+      shift 2
+      ;;
+    -*)
+      usage
+      exit 1
+      ;;
+    *)
+      bases="$bases $1"
+      shift
+      ;;
+  esac
+done
+
+if [ "$debug" = "on" ] ; then
+  verbose "Turning debug on."
+  set -x
+fi
+
+if [ "$compressed" = "on" ] ; then
+  verbose "Displaying compressed files contents enabled."
+fi
+
+if [ ! -d "$data" ]; then
+  echo "$me: '$data' doesn't exist"
+  exit 1
+fi
+
+verbose "Data dir is set to '$data'."
+
+cd "$data"
+
+if [ -z "`find ./ | find_filter`" ]
+then
+  echo "$me: there are no databases in '$data'"
+  exit 1
+fi
+
+for i in $bases ; do
+  if [ "$i" = "all" ] ; then
+    show_all=on
+    verbose "Showing all databases contents."
+  fi
+done
+
+if [ "x$bases" = "x" ]; then
+  for base in `bases_list`; do
+    print_base_name "$base"
+  done
+  exit 0
+fi
+
+if [ "$show_all" = "on" ]; then
+  for base in `bases_list`; do
+    print_base_name "$base"
+    if [ "$compressed" = "on" ] ; then
+      ccat $base | sed 's/^/  /'
+    else
+      ccat $base | egrep -v '#' | sed 's/^/  /'
+    fi
+  done
+  exit 0
+fi
+
+for base in $bases
+do
+  if [ -e "$data/$base" ]; then
+    print_base_name "$base"
+    if [ "$compressed" = "on" ] ; then
+      ccat $base | sed 's/^/  /'
+    else
+      ccat $base | egrep -v '#' | sed 's/^/  /'
+    fi
+  else
+    echo "$me: base $base doesn't exist"
+  fi
+done
+exit 0

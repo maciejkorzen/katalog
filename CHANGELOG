@@ -1,0 +1,91 @@
+katalog 1.10pre2
+        - added bases_list(),
+        - katls cleaned up.
+
+katalog 1.10pre1
+	- unmounting works on FreeBSD,
+	- the `for' loops were changed to `while' in code responsible for
+	  listing compressed files contents,
+        - more verbose adding of compressed files,
+	- usage of katadd and katsch has changed a lot (see katadd -h
+          and katsch -h),
+        - added CGI frontend.
+
+katalog 1.9
+	- only version number changed ;-). Just to put this as stable on
+	  Freshmeat (1.8c wasn't released on Freshmeat).
+
+Katalog v 1.8c
+	- check_cd was default to 'yes', should be 'on' (thx. mixo).
+
+Katalog v 1.8b
+	- rewritten code responsible for parsing program arguments because of
+	  wrong parsing arguments with spaces (thx. Peter Fröbel),
+	- added override option in katadd,
+	- added is_empty and check_arg functions,
+	- added '-m dir' option in katadd,
+	- katadd recognizes RPM files,
+	- few fixes in usage() functions,
+	- added SuSE spec (thx. Peter Fröbel),
+	- added option to eject CD-ROM after unmounting (thx. Peter Fröbel),
+	- README updated.
+
+Katalog v 1.8
+	- configuration is read also from .katalogrc and katalogrc in current
+	  dir,
+	- in Makefile rel changed to pkg, new way of checking katalog's
+	  version,
+	- new configuration variables: verbose, debug, reverse (thx. KaCzY),
+	  automount (thx. KaCzY), compress_prog (thx. KaCzY), compressed,
+	  desc_expr (thx. Peter Fröbel), case_sensitive,
+	- any messages are showed only when -v is used,
+	- added version(), unmount() and ccat() functions to scripts,
+	- a lot of new arguments (see 'command -h' for details),
+	- getopt is used to analyze arguments,
+	- bases can be compressed with gzip or bzip2,
+	- CD-ROMs can be mounted by katadd if You want to,
+	- list of files in compressed archives are saved in bases too (now only
+	  tar.gz, tar.bz2 and zip files),
+	- CVS 'Id' tag added,
+	- 'source' was changed to '.' (works with FreeBSD's /bin/sh),
+
+Katalog v 1.7b
+	- all homepage addresses are changed to ceti.pl/eaquer/...
+	- added 'prefix', 'bindir' and 'sysconfdir' variables to Makefile.
+
+Katalog v 1.7
+	- added Makefile, simpler installation and uninstallation,
+	- added 'version' variable to katalogrc,
+	- all programs in scripts are not called by full path,
+	- added next available config file location: ~/.katalogrc (idea by
+	  Grzegorz Go³awski), users can put bases dir in their's homedir,
+	- added spec for PLD in PLD/ (by Grzegorz Go³awski).
+
+Katalog v 1.6
+	- added '-i' to egrep args -- case insensitive.
+
+Katalog v 1.5
+	- README: point about Katalog GPG signature added,
+	- --version added to all scripts, and info about katalog version to usage(),
+	- sed is called through $SED, because in Debian it is in /bin/sed, not
+	  in /usr/bin/sed. Thanks to Bartlomiej Partyka,
+	- CD-ROM check was broken, corrected.
+
+Katalog v 1.4
+	- this CHANGELOG added, thanks to KaCzY
+	- katadd: "if ! cat /etc/mtab | grep -q cdrom" changed to
+	      "if ! grep -q cdrom /etc/mtab"
+	- katls: in usage() "forst" corrected to "first"
+	- CD-ROM presence is now checked with:
+	/bin/ls $cd >/dev/null 2>&1,
+	  so it will work, even if You are using Supermount.
+	- form now every Katalog release will be having it's signature done with GPG.
+	  You can find my GPG public key at http://linux.sky.pl/maciek/pgp. 
+
+Katalog v 1.3
+	- katalogrc now can be located in /usr/local/etc
+
+Katalog v 1.2
+	- Katalog project at Freshmeat added
+
+ vim:tw=80:

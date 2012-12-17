@@ -1,0 +1,74 @@
+
+			Katalog HOW TO
+
+This document describes how to start using Katalog.
+
+1. Installation
+
+To install Katalog, cd to source directory and run following command as root:
+
+# make install
+
+2. Configure Katalog
+
+In /usr/local/etc You will find file named katalogrc. It is main configuration
+file for katalog. You can copy it to Your home directory as .katalogrc. Edit the
+configuration file, You can set $data to directory in Your home dir if You don't
+want to share databases with other users.
+
+3. Add first base
+
+To add a base, insert CD-ROM into drive and run command:
+
+# katadd short_description "Very long base description"
+
+'short_description' is the name of file that will be created in directory with
+bases, and "Very long base description" will be placed in the
+short_description.dsc file.
+
+4. Check if base was created
+
+To check if base was created, run:
+
+# katls
+
+You should see name of base that You just created.
+
+5. Search for a file
+
+To search for a file in bases run:
+
+# katsch "expression"
+
+Where "expression" is egrep(1) style regular expression. For example:
+
+# katsch "/linux-[24].*\.tar\.gz"
+
+6. There are some advises from Don Dufresne:
+
+You will need to decide on a preliminary numbering scheme that allows for growth
+of your database over the life of the system. A database that allows for 9999
+ultimate entries could begin with the command:
+
+# katadd 0001 CD0001 -a -e
+
+This will create entry 0001.dsc, a corresponding 0001 gzip file, place the text
+"CD0001" in the 0001.dsc file, read and 'katalog' the contents of the CD, and
+eject the CD.  
+
+You would then enter the command:
+
+# pico /usr/share/katalog/0001.dsc
+
+The file would reveal the text "CD0001"
+
+Here you can establish additional title data, such as:
+
+CD 0001
+Project Archive
+Freshmeat
+02/03/2003
+
+This title information will be included on all 'katsch' or katls' searches and
+provides additional descriptive information when searching through a long list
+of returned data when searching your archive.

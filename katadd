@@ -1,0 +1,457 @@
+#!/bin/sh
+# Katalog by Maciej Korzen <maciek@korzen.org>
+# KATalogADDbase - add base.
+#
+#    Copyright (C) 2001-2003 Maciej Korzen
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+# Default settings
+automount="off"
+cd="/cdrom"
+check_cd="on"
+compress_prog="gzip"
+compressed="on"
+data="/usr/share/katalog"
+debug="off"
+eject="off"
+me="`basename $0`"
+override="off"
+reverse="off"
+verbose="off"
+version="1.10pre2"
+BOLD="\033[1;37m"
+NORMAL="\033[0m"
+
+# Load settings
+for i in /etc/katalogrc /usr/local/etc/katalogrc .katalogrc katalogrc $HOME/.katalogrc ; do
+  if [ -e "$i" ] ; then
+    . "$i"
+  fi
+done
+
+# Compressed file CAT
+ccat() {
+  type="`file \"$1\" 2>&1`"
+  if echo "$type" | grep -q gzip; then
+    cat "$1" | gunzip
+  elif echo "$type" | grep -q bzip2; then
+    cat "$1" | bunzip2
+  elif echo "$type" | egrep -q ASCII; then
+    cat "$1"
+  else
+    echo "$me: $1 - unknown type of file" >&2
+    exit 1
+  fi
+}
+
+check_val() {
+  if [ "x$2" != "xon" -a "x$2" != "xoff" ]; then
+    verbose "$me: $2 is bad value for $1"
+    exit 1
+  fi
+}
+
+find_filter() {
+  sed 's/^.\///' | egrep -v '(^ *$|^./$|^.$)' | sort
+}
+
+is_empty() {
+  if [ -z "$2" ] ; then
+    verbose "$me: argument for $1 needed"
+    exit 1
+  fi
+}
+
+rmspaces() {
+  if [ "x`uname -s`" = "xFreeBSD" ]; then
+    sed -E 's,^ +,,'
+  else
+    sed 's,^ \+,,'
+  fi
+}
+
+unmount() {
+  if [ "x$unmount" = "xon" ] ; then
+    if [ "x$eject" = "xon" -a "x`uname -s`" = "xFreeBSD" ]; then
+      cd_dev=`mount | grep "$cd" | head -n 1 | cut -d ' ' -f 1`
+      if [ "x$cd_dev" = "x" ]; then
+        verbose "Can't find CD-ROM device name. Not ejecting."
+        eject=off
+      fi
+    fi
+    umount $cd
+    if [ "$?" = "1" ]; then
+      verbose "Can't unmount CD-ROM."
+      exit 1
+    fi
+    if [ "x$eject" = "xon" ] ; then
+      if [ "x`uname -s`" = "xFreeBSD" ]; then
+        echo eject | cdcontrol -f "$cd_dev" >/dev/null 2>&1
+      else
+        if which eject >/dev/null 2>&1 ; then
+          eject "$cd"
+        else
+          verbose "I can't find eject program, not ejecting CD-ROM."
+        fi
+      fi
+    fi
+  fi
+}
+
+usage() {
+cat << EOF
+Usage: katadd [-h] [-V] [-k dir] [-m dir] [-p program] [-a on|off] [-c on|off]
+              [-e on|off] [-o on|off] [-r on|off] [-s on|off] [-d on|off]
+              [-v on|off] "name_of_base" "base description"
+  -h              this help
+  -V              display version number
+  -k dir          \`dir' is a dircetory with bases
+  -m dir          directory where CD-ROM is mounted
+  -p bzip2|gzip|none   bzip2: use bzip2 to compress bases
+                       gzip:  use gzip to compress bases
+                       none:  don't compress bases
+  -a on|off	  on:  mount CD-ROM if unmounted (and unmount after creating base)
+                  off: don't mount CD-ROM
+  -c on|off	  on:  save contents of compressed files
+                  off: don't save contents of compressed files
+  -e on|off       on:  eject CD-ROM after unmounting
+                  off: don't eject CD-ROM
+  -o on|off       on:  override existing bases
+                  off: don't override existing bases
+  -r on|off       on:  display bases names as 'file_name (Description of base)'
+                  off: display bases names as 'Description of base (file_name)'
+  -s on|off       on:  stop if CD-ROM is not mounted
+                  off: don't stop even if CD-ROM is unmounted
+  -d on|off       turn debug mode on or off
+  -v on|off       turn verbose mode on or off
+  "name_of_base"	short identifier for base
+  "base description"	long description of base
+EOF
+}
+
+verbose() {
+  if [ "x$verbose" = "xon" ] ; then
+    echo "$@"
+  fi
+}
+
+version() {
+  echo "Katalog $version"
+}
+
+check_val automount "$automount"
+check_val check_cd "$check_cd"
+check_val compressed "$compressed"
+check_val debug "$debug"
+check_val eject "$eject"
+check_val override "$override"
+check_val reverse "$reverse"
+check_val verbose "$verbose"
+ 
+while [ "$#" -gt 0 ] ; do
+  case $1 in
+    -h)
+      usage
+      exit 0
+      ;;
+    -V)
+      version
+      exit 0
+      ;;
+    -k)
+      is_empty "-k" "$2"
+      data="$2"
+      shift 2
+      ;;
+    -m)
+      is_empty "-m" "$2"
+      cd="$2"
+      shift 2
+      ;;
+    -p)
+      compress_prog="$2"
+      shift 2
+      ;;
+    -a)
+      automount="$2"
+      check_val "-a" "$automount"
+      shift 2
+      ;;
+    -c)
+      compressed="$2"
+      check_val "-c" "$compressed"
+      shift 2
+      ;;
+    -e)
+      eject="$2"
+      check_val "-e" "$eject"
+      shift 2
+      ;;
+    -o)
+      override="$2"
+      check_val "-o" "$override"
+      shift 2
+      ;;
+    -r)
+      reverse="$2"
+      check_val "-r" "$reverse"
+      shift 2
+      ;;
+    -s)
+      check_cd="$2"
+      check_val "-s" "$check_cd"
+      shift 2
+      ;;
+    -d)
+      debug="$2"
+      check_val "-d" "$debug"
+      shift 2
+      ;;
+    -v)
+      verbose="$2"
+      check_val "-v" "$verbose"
+      shift 2
+      ;;
+    *)
+      if [ "x$name" = "x" ] ; then
+        name="$1"
+        shift
+        continue
+      fi
+      if [ "x$desc" = "x" ] ; then
+        desc="$1"
+        shift
+        continue
+      fi
+      usage
+      exit 0
+      ;;
+  esac
+done
+
+if [ "$debug" = "on" ] ; then
+  verbose "Turning debug on."
+  set -x
+fi
+
+if [ "$reverse" = "on" ] ; then
+  verbose "Reverse mode is on."
+fi
+
+if [ "x$compress_prog" != "xgzip" ] && [ "x$compress_prog" != "xbzip2" ] && \
+   [ "x$compress_prog" != "xnone" ]  ; then
+  verbose "Bad compress program, use 'bzip2', 'gzip' or 'none'."
+  usage
+  exit 1
+fi
+
+if [ -z "$name" -o -z "$desc" ]
+then
+  [ -z "$name" ] && verbose "Base name not given."
+  [ -z "$desc" ] && verbose "Base description not given."
+  usage
+  exit 1
+fi
+
+verbose "Base name is '$name'."
+verbose "Base description is '$desc'."
+
+if [ ! -d "$cd" -a ! -L "$cd" ]
+then
+  echo "$me: $cd must be a directory"
+  exit 1
+fi
+
+verbose "CD-ROM dir is '$cd'."
+
+if [ -e "$data/$name" ]; then
+  if [ "$override" = "off" ] ; then
+    echo "$me: there already is base $name"
+    exit 1
+  fi
+  verbose "There already is base '$name'. Replacing."
+fi
+
+if [ ! -d "$data" -a ! -L "$data" ]; then
+  if [ -e "$data" ]; then
+    echo "$me: $data must be a directory!"
+    exit 1
+  else
+    verbose "Making data dir '$data'."
+    mkdir $data
+  fi
+fi
+
+if [ "`find $cd | wc -l`" -gt "1" ] && mount | grep -q " on $cd " ; then
+  cdstatus=mounted
+else
+  cdstatus=unmounted
+fi
+
+if [ "$cdstatus" = "unmounted" ]; then
+  if [ "$automount" = "on" ]; then
+    verbose "Mounting CD-ROM."
+    if mount $cd >/dev/null 2>&1; then
+      check_cd=off
+      unmount=on
+    else
+      echo "Can't mount CD-ROM."
+      exit 1
+    fi
+  fi
+  if [ "$check_cd" = "on" ]; then
+    echo "CD-ROM is not mounted (run 'katadd -h' for help)."
+    exit 1
+  fi
+fi
+
+echo "$desc" > "$data/$name.dsc"
+verbose "Creating base."
+
+cd "$cd"
+find ./ | find_filter > "$data/$name"
+
+if [ "$compressed" = "on" ] ; then
+  verbose "Saving content of compressed files..."
+  compressed_found=0
+  # tar.gz files
+  if which tar >/dev/null 2>&1 && which gzip >/dev/null 2>&1 ; then
+    cat "$data/$name" | egrep -v '#' | egrep -i '\.(tar\.gz|tgz)$' > "$data/$name-targz"
+    count=`wc -l < "$data/$name-targz" | rmspaces`
+    if [ "$count" -gt "0" ]; then
+      compressed_found=1
+      current=1
+      while read i; do
+        verbose "TAR.GZ: $current of $count: $i"
+        cat "$cd/$i" | gunzip 2>/dev/null | tar -tf - 2>/dev/null | sed "s:^:$i#:" > "$data/$name-targz.tmp"
+        if [ `wc -l < "$data/$name-targz.tmp"` -eq "0" ]; then
+          verbose "Error while opening ${cd}/${i}."
+        else
+          cat "$data/$name-targz.tmp" >> "$data/$name"
+        fi
+        current=`expr $current + 1`
+        rm "$data/$name-targz.tmp"
+      done < "$data/$name-targz"
+    fi
+    rm "$data/$name-targz"
+  else
+    verbose "\`tar' and \`gz' not found."
+  fi
+  # tar.bz2 files
+  if which tar >/dev/null 2>&1 && which bzip2 >/dev/null 2>&1 ; then
+    cat "$data/$name" | egrep -v '#' | egrep -i '\.tar\.bz2$' > "$data/$name-tarbz2"
+    count=`wc -l < "$data/$name-tarbz2" | rmspaces`
+    if [ "$count" -gt "0" ]; then
+      compressed_found=1
+      current=1
+      while read i; do
+        verbose "TAR.BZ2: $current of $count: $i"
+        cat "$cd/$i" | bunzip2 2>/dev/null | tar -tf - 2>/dev/null | sed "s:^:$i#:" > "$data/$name-tarbz2.tmp"
+        if [ `wc -l < "$data/$name-tarbz2.tmp"` -eq "0" ]; then
+          verbose "Error while opening ${cd}/${i}."
+        else
+          cat "$data/$name-tarbz2.tmp" >> "$data/$name"
+        fi
+        current=`expr $current + 1`
+        rm "$data/$name-tarbz2.tmp"
+      done < "$data/$name-tarbz2"
+    fi
+    rm "$data/$name-tarbz2"
+  else
+    verbose "\`tar' and \`bz2' not found."
+  fi
+  # rpm files
+  if which rpm >/dev/null 2>&1 ; then
+    cat "$data/$name" | egrep -v '#' | egrep -i '\.rpm$' > "$data/$name-rpm"
+    count=`wc -l < "$data/$name-rpm" | rmspaces`
+    if [ "$count" -gt "0" ]; then
+      compressed_found=1
+      current=1
+      while read i ; do
+        verbose "RPM: $current of $count: $i"
+        rpm -ql -p "$cd/$i" 2>/dev/null | egrep '^/' | sed "s:^/:$i#:" > "$data/$name-rpm.tmp"
+        if [ `wc -l < "$data/$name-rpm.tmp"` -eq "0" ]; then
+          verbose "Error while opening ${cd}/${i}."
+        else
+          cat "$data/$name-rpm.tmp" >> "$data/$name"
+        fi
+        current=`expr $current + 1`
+        rm "$data/$name-rpm.tmp"
+      done < "$data/$name-rpm"
+    fi
+    rm "$data/$name-rpm"
+  else
+    verbose "\`rpm' not found."
+  fi
+  # zip files
+  if which zipinfo >/dev/null 2>&1 ; then
+    cat "$data/$name" | egrep -v '#' | egrep -i '\.zip$' > "$data/$name-zip"
+    count=`wc -l < "$data/$name-zip" | rmspaces`
+    if [ "$count" -gt "0" ]; then
+      compressed_found=1
+      current=1
+      while read i ; do
+        verbose "ZIP: $current of $count: $i"
+        zipinfo -l1 "$cd/$i" 2>/dev/null | sed "s:^:$i#:" > "$data/$name-zip.tmp"
+        if [ `wc -l < "$data/$name-zip.tmp"` -eq "0" ]; then
+          verbose -e "Error while opening ${cd}/${i}."
+        else
+          cat "$data/$name-zip.tmp" >> "$data/$name"
+        fi
+        current=`expr $current + 1`
+        rm "$data/$name-zip.tmp"
+      done < "$data/$name-zip"
+    fi
+    rm "$data/$name-zip"
+  else
+    verbose "\`zipinfo' not found."
+  fi
+  if [ "x$compressed_found" = "x0" ]; then
+    verbose "...there are no compressed files."
+  fi
+fi
+
+if [ "$compress_prog" != "none" ]; then
+  verbose "Compressing base content with $compress_prog."
+  cat "$data/$name" | sort | $compress_prog > "$data/$name.tmp"
+  mv "$data/$name.tmp" "$data/$name"
+fi
+
+if [ "$?" = "0" ]
+then
+  if [ "$reverse" = "on" ] ; then
+    verbose -e "Base for ${BOLD}$name${NORMAL} ($desc) created."
+  else
+    verbose -e "Base for ${BOLD}$desc${NORMAL} ($name) created."
+  fi
+  cd - ; unmount
+else
+  if [ "$reverse" = "on" ] ; then
+    echo -e "There was error while creating base for ${BOLD}${name}${NORMAL} ($desc)."
+  else
+    echo -e "There was error while creating base for ${BOLD}${desc}${NORMAL} ($name)."
+  fi
+  if [ -f "$katalog/$name" ]; then
+    verbose "Deleting '$katalog/$name'."
+    rm "$katalog/$name"
+  fi
+  if [ -f "$katalog/$name.dsc" ]; then
+    verbose "Deleting '$katalog/$name.dsc'."
+    rm "$katalog/$name.dsc"
+  fi
+  cd - ; unmount
+  exit 1
+fi

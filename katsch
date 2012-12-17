@@ -1,0 +1,313 @@
+#!/bin/sh
+# Katalog by Maciej Korzen <maciek@korzen.org>
+# KATalogSearCH - look for expression in bases
+#
+#    Copyright (C) 2001-2003 Maciej Korzen
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+# Default settings
+case_sensitive="off"
+compressed="on"
+data="/usr/share/katalog"
+debug="off"
+desc_expr=""
+egrep_args="-i"
+html="off"
+me="`basename $0`"
+reverse="off"
+verbose="off"
+version="1.10pre2"
+BOLD="\033[1;37m"
+NORMAL="\033[0m"
+
+# Load settings
+for i in /etc/katalogrc /usr/local/etc/katalogrc .katalogrc katalogrc $HOME/.katalogrc ; do
+  if [ -e "$i" ] ; then
+    . "$i"
+  fi
+done
+
+# List all bases
+bases_list() {
+  find ./ -type f ! -name '*.dsc' | find_filter
+}
+
+# Compressed file CAT
+ccat() {
+  type="`file \"$1\"`"
+  if echo "$type" | grep -q gzip; then
+    cat "$1" | gunzip
+  elif echo "$type" | grep -q bzip2; then
+    cat "$1" | bunzip2
+  elif echo "$type" | grep -q ASCII; then
+    cat "$1"
+  else
+    echo "$me: $1 - unknown type of file" >&2
+    exit 1
+  fi
+}
+
+check_val() {
+  if [ "x$2" != "xon" -a "x$2" != "xoff" ]; then
+    verbose "$me: $2 is bad value for $1"
+    exit 1
+  fi
+}
+
+find_filter() {
+  sed 's/^.\///' | egrep -v '(^ *$|^./$|^.$)' | sort
+}
+
+is_empty() {
+  if [ -z "$2" ] ; then
+    verbose "$me: argument for $1 needed"
+    exit 1
+  fi
+}
+
+usage() {
+cat << EOF
+usage: katsch [-h] [-V] [-k dir] [-c on|off] [-r on|off] [-s on|off] [-w on|off]
+              [-d on|off] [-v on|off] [-D string] "expression"
+  -h              this help
+  -V              display version number
+  -k dir          'dir' is a dircetory with bases
+  -c on|off       on:  search also in contents of compressed files
+                  off: don't search in contents of compressed files
+  -r on|off       on:  display bases names as 'file_name (Description of base)'
+                  off: display bases names as 'Description of base (file_name)'
+  -s on|off       turn case sensitive search on or off
+  -w on|off       turn on or off displaying results in HTML
+  -d on|off       turn debug mode on or off
+  -v on|off       turn verbose mode on or off
+  -D string       search only in bases whose descriptions metches 'string'
+  "expression"    regular expression to search for in bases.
+EOF
+}
+
+verbose() {
+  if [ "x$verbose" != "xoff" -a "x$html" = "xoff" ] ; then
+    echo "$@"
+  fi
+}
+
+version() {
+  echo "Katalog $version"
+}
+
+check_val case_sensitive "$case_sensitive"
+check_val compressed "$compressed"
+check_val debug "$debug"
+check_val reverse "$reverse"
+check_val verbose "$verbose"
+
+while [ "$#" -gt 0 ] ; do
+  case $1 in
+    -h)
+      usage
+      exit 0
+      ;;
+    -V)
+      version
+      exit 0
+      ;;
+    -k)
+      is_empty "-k" "$2"
+      data="$2"
+      shift 2
+      ;;
+    -c)
+      compressed="$2"
+      check_val "-c" "$compressed"
+      shift 2
+      ;;
+    -r)
+      reverse="$2"
+      check_val "-r" "$reverse"
+      shift 2
+      ;;
+    -s)
+      case_sensitive="$2"
+      check_val "-s" "$case_sensitive"
+      shift 2
+      ;;
+    -w)
+      html="$2"
+      check_val "-s" "$html"
+      shift 2
+      ;;
+    -d)
+      debug="$2"
+      check_val "-d" "$debug"
+      shift 2
+      ;;
+    -v)
+      verbose="$2"
+      check_val "-v" "$verbose"
+      shift 2
+      ;;
+    -D)
+      is_empty "-D" "$2"
+      desc_expr="$2"
+      shift 2
+      ;;
+    *)
+      if [ "x$expression" = "x" ] ; then
+        expression="$1"
+        shift
+        continue
+      fi
+      if [ "x$html" = "xoff" ]; then
+        usage
+      fi
+      exit 0
+      ;;
+  esac
+done
+
+if [ "$debug" = "on" -a "x$html" = "xoff" ] ; then
+  verbose "Turning debug on."
+  set -x
+fi
+
+if [ "$reverse" = "on" ] ; then
+  verbose "Reverse mode is on."
+fi
+
+if [ "x$desc_expr" != "x" ] ; then
+  verbose "Searching only in bases whose descriptions matches '$desc_expr'."
+fi
+
+if [ "$case_sensitive" = "on" ] ; then
+  verbose "Case sensitive search."
+  egrep_args=""
+fi
+
+if [ "x$expression" = "x" ] ; then
+  if [ "x$html" = "xon" ]; then
+    echo "<b>Expression not given.</b>"
+  else
+    verbose "Expression not given."
+  fi
+  exit 1
+fi
+
+if [ "$compressed" = "on" ] ; then
+  verbose "Searching in compressed files contents enabled."
+fi
+
+verbose "Searching for '$expression'."
+
+if [ ! -d "$data" ]; then
+  echo "$me: '$data' doesn't exist"
+  exit 1
+fi
+
+if [ ! -w "$data" ]; then
+  echo "$me: You must have write permissions to '$data'"
+  exit 1
+fi
+
+verbose "Data dir is '$data'."
+
+cd "$data"
+
+if [ -z "`find ./ | find_filter`" ]
+then
+  echo "$me: there are no databases in '$data'"
+  exit 1
+fi
+
+echo -n > "$data/.all_bases"
+echo -n > "$data/.all_bases2"
+echo -n > "$data/.search_in"
+
+bases_list > "$data/.all_bases"
+while read i; do
+  if [ -e "$data/$i.dsc" ]; then
+    echo "$i" >> "$data/.all_bases2"
+  fi
+done < "$data/.all_bases"
+
+mv "$data/.all_bases2" "$data/.all_bases"
+
+if [ "x$desc_expr" = "x" ] ; then
+  mv "$data/.all_bases" "$data/.search_in"
+  verbose "Searching in all bases."
+else
+  while read i; do
+    if cat "$i.dsc" | egrep -q $egrep_args -- "$desc_expr"; then
+      echo "$i" >> "$data/.search_in"
+    fi
+  done < "$data/.all_bases"
+  rm "$data/.all_bases"
+  if [ "`wc -l < \"$data/.search_in\"`" -eq "0" ] ; then
+    verbose "No bases to search in."
+    rm "$data/.search_in"
+    exit 1
+  fi
+  verbose -n "Searching in bases:"
+  for i in `cat $data/.search_in`; do
+    verbose -n " $i"
+  done
+  verbose "."
+fi
+
+while read base; do
+  if [ "$compressed" = "on" ] ; then
+    inbase="`ccat \"$base\" | egrep $egrep_args -- \"$expression\"`"
+  else
+    inbase="`ccat \"$base\" | egrep $egrep_args -- \"$expression\" | grep -v '#'`"
+  fi
+
+  if [ -n "$inbase" ]; then
+    desc="`cat \"$data/$base.dsc\"`"
+    if [ "$reverse" = "on" ] ; then
+      if [ "x$html" = "xon" ]; then
+        echo "<b>${base}</b> ($desc):<br>"
+      else
+        echo -e "${BOLD}$base${NORMAL} ($desc):"
+      fi
+    else
+      if [ "x$html" = "xon" ]; then
+        echo "<b>${desc}</b> ($base):<br>"
+      else
+        echo -e "${BOLD}${desc}${NORMAL} ($base):"
+      fi
+    fi
+    if [ "x$html" = "xon" ]; then
+      echo "$inbase" | while read i; do
+        echo "&nbsp;&nbsp;$i<br>"
+      done
+    else
+      echo "$inbase" | sed 's/^/  /'
+    fi
+    anything_found=yes
+  fi
+done < "$data/.search_in"
+
+rm "$data/.search_in"
+
+if [ "$anything_found" != "yes" ]
+then
+  if [ "x$html" = "xon" ]; then
+    echo "Nothing found."
+  else
+    verbose "Nothing found."
+  fi
+  exit 1
+fi
+

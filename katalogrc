@@ -1,0 +1,26 @@
+# Dir, where all data files are stored:
+data="/usr/share/katalog"
+# Dir, where CD is mounted:
+cd="/cdrom"
+# Check if CD is mounted?
+check_cd="on"
+# Show more messages?
+verbose="off"
+# Turn debug on?
+debug="off"
+# Show bases names in format 'file_name (Base description)'?
+reverse="off"
+# Search only in bases whose descriptions matches:
+desc_expr=""	# Empty means all bases.
+# Case sensitive search?
+case_sensitive="off"
+# Mount CD-ROM if needed?
+automount="off"
+# bzip2, gzip or none compression for new bases?
+compress_prog="gzip"
+# Save also contents of compressed files?
+compressed="on"
+# Override existing bases?
+override="off"
+# Eject CD-ROM after unmount?
+eject="off"

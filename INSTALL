@@ -1,0 +1,21 @@
+
+1a. To install katalog in /usr/local/bin, and katalog config file in
+    /usr/local/etc, run:
+
+# make install
+
+1b. If you want to install in other location, use DESTDIR:
+
+# make DESTDIR=/usr install
+
+2a. To uninstall katalog, run:
+
+# make uninstall
+
+2b. To uninstall form /usr, do:
+
+# make DESTDIR=/usr uninstall
+
+That's all.
+
+If You want to build a package, You can use prefix, sysconfdir and bindir also.
