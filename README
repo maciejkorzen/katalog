@@ -47,8 +47,8 @@ user who runs WWW server. Otherwise katsch won't run.
 
 8. Where to find current Katalog version?
 Current version with GPG signature You can find here:
-http://www.ceti.pl/eaquer/katalog/. My GPG key is at
-http://www.ceti.pl/eaquer/pgp.
+http://www.korzen.org/soft/katalog/. My GPG key is at
+http://www.korzen.org/maciej_korzen.asc.
 
 9. Greetings
 KaCzY - he found some bugs, ideas: use of bzip2, automount and reverse (-r),
